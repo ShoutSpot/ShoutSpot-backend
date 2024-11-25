@@ -19,7 +19,9 @@
   "homepage": "https://github.com/Shreyas200110/ShoutSpot-backend#readme",
   "description": "",
   "devDependencies": {
-    "@types/node": "^22.9.1",
-    "typescript": "^5.6.3"
+    "@types/node": "^22.9.3",
+    "prisma": "^5.22.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.2"
   }
 }
