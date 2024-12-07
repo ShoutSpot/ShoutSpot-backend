@@ -5,7 +5,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "tsc",
-    "start": "node build/index.js"
+    "dev": "ts-node-dev src/server.ts",
+    "start": "node dist/server.js"
   },
   "repository": {
     "type": "git",
@@ -19,12 +20,22 @@
   "homepage": "https://github.com/Shreyas200110/ShoutSpot-backend#readme",
   "description": "",
   "devDependencies": {
-    "@types/node": "^22.9.3",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/node": "^22.10.1",
     "prisma": "^5.22.0",
     "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
     "typescript": "^5.7.2"
   },
   "dependencies": {
-    "@prisma/client": "^5.22.0"
+    "@prisma/client": "^5.22.0",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2"
   }
 }
