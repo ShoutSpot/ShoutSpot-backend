@@ -25,6 +25,8 @@ model User {
   id             String   @id @default(uuid())
   firstname      String
   email          String   @unique
-  password       String
+  password       String?
+  googleUID      String?
+  isGoogleUser   Boolean
   role           Role  @default(USER)
 }
