@@ -16,17 +16,82 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id          Int   @id @default(autoincrement())
+  firstname   String
+  email       String   @unique
+  password    String?
+  googleUID   String?
+  isGoogleUser Boolean
+  role        Role     @default(USER)
+  spaces      Space[]  // Relation to Space
+}
+
+model Space {
+  id                 Int   @id @default(autoincrement())
+  spaceName          String
+  logo               String?
+  squareLogo         Boolean  @default(false)
+  spaceHeading       String
+  customMessage      String
+  questions          Question[]
+  collectExtraInfo   CollectExtraInfo?
+  collectionType     String
+  collectStarRatings Boolean  @default(false)
+  language           String
+  thankYouImage      String?
+  thankYouTitle      String? @default("Thank you!")
+  thankYouMessage    String? @default("Thank you so much for your shoutout! It means a ton for us! 🙏")
+  redirectPageLink   String?
+  maxVideoDuration   Int      @default(30)
+  maxCharsAllowed    Int      @default(128)
+  videoButtonText    String  @default("Record a video")
+  textButtonText     String @default("Record a text")
+  consentText        String? @default("I give permission to use this testimonial")
+  textSubmissionTitle String?
+  questionLabel      String? @default("QUESTIONS")
+  userId             Int
+  user               User     @relation(fields: [userId], references: [id])
+  reviews            Review[]
+}
+
+model Question {
+  id      Int   @id @default(autoincrement())
+  text    String
+  order   Int
+  spaceId Int
+  space   Space  @relation(fields: [spaceId], references: [id])
+}
+
+model CollectExtraInfo {
+  id          Int   @id @default(autoincrement())
+  name       Boolean @default(true)
+  email      Boolean @default(false)
+  company    Boolean @default(false)
+  socialLink Boolean @default(false)
+  address    Boolean @default(false)
+  spaceId    Int @unique
+  space   Space  @relation(fields: [spaceId], references: [id])
+}
+
+model Review {
+  id          Int   @id @default(autoincrement())
+  reviewType        String
+  positiveStarsCount Int      @default(5) 
+  reviewText        String?
+  reviewImage       String?
+  reviewVideo       String?
+  userLogo          String?
+  userDetails       Json
+  isLiked           Boolean  @default(false)
+  submitDateTime    DateTime @default(now())
+  isSpam            Boolean @default(false)
+  spaceId           Int
+  space             Space    @relation(fields: [spaceId], references: [id])
+}
+
+
 enum Role {
   USER
   ADMIN
-}
-
-model User {
-  id             String   @id @default(uuid())
-  firstname      String
-  email          String   @unique
-  password       String?
-  googleUID      String?
-  isGoogleUser   Boolean
-  role           Role  @default(USER)
 }
