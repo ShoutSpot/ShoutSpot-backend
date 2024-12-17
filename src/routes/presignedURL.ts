@@ -10,16 +10,19 @@ router.use(authenticateToken);
 
 // Endpoint to generate a pre-signed URL
 router.get('/', async (req: any, res: any) => {
-    const { fileName, fileType } = req.query;
+    const { fileName, fileType, folder } = req.query;
 
     // Ensure file name and type are provided
     if (!fileName || !fileType) {
         return res.status(400).json({ message: 'File name and type are required' });
     }
+    if(folder !== 'Images' && folder !== 'Videos') {
+        return res.status(401).json({ message: 'Invalid Folder' });
+    }
 
     const s3Params = {
         Bucket: process.env.S3_BUCKET_NAME,
-        Key: `Images/${fileName}`,
+        Key: `${folder}/${fileName}`,
         Expires: 60 * 5, // URL expires in 5 minutes
         ContentType: fileType,
         ACL: 'private'

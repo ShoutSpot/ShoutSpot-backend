@@ -56,9 +56,9 @@ model Space {
 }
 
 model Question {
-  id      Int   @id @default(autoincrement())
+  questionId     Int   @id @default(autoincrement())
   text    String
-  order   Int
+  id   Int
   spaceId Int
   space   Space  @relation(fields: [spaceId], references: [id])
 }
@@ -75,13 +75,12 @@ model CollectExtraInfo {
 }
 
 model Review {
-  id          Int   @id @default(autoincrement())
+  reviewID          Int   @id @default(autoincrement())
   reviewType        String
   positiveStarsCount Int      @default(5) 
   reviewText        String?
   reviewImage       String?
   reviewVideo       String?
-  userLogo          String?
   userDetails       Json
   isLiked           Boolean  @default(false)
   submitDateTime    DateTime @default(now())
