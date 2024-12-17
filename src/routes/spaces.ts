@@ -26,6 +26,7 @@ router.get("/", async (req: any, res: any) => {
             include: {
                 questions: true,
                 collectExtraInfo: true,
+                reviews: true
             },
         });
 
@@ -33,11 +34,24 @@ router.get("/", async (req: any, res: any) => {
         const updatedSpaces = await Promise.all(spaces.map(async space => {
             const logoUrl = space.logo ? await getPresignedUrl(space.logo, 'getObject', 3600) : null;
             const thankYouImageUrl = space.thankYouImage ? await getPresignedUrl(space.thankYouImage, 'getObject', 3600) : null;
+            const textCount = space.reviews.filter(review => review.reviewType === 'text').length;
+            const videoCount = space.reviews.filter(review => review.reviewType === 'video').length;
+            delete (space as any).reviews;
+            delete (space as any).userId;
+            space.questions.forEach((question: any) => {
+                delete question.questionId;
+                delete question.spaceId;
+            })
+            delete(space as any).collectExtraInfo.spaceId;
+            delete(space as any).collectExtraInfo.id;
 
             return {
-                ...space,
-                logo: logoUrl,
-                thankYouImage: thankYouImageUrl
+                videoCount, textCount,
+                spaceInfo: {
+                    ...space,
+                    logo: logoUrl,
+                    thankYouImage: thankYouImageUrl
+                }
             };
         }));
 
@@ -47,6 +61,57 @@ router.get("/", async (req: any, res: any) => {
         res.status(500).json({ message: 'Failed to fetch spaces', error });
     }
 });
+
+router.get("/single-space/:spaceName", async (req: any, res: any) => {
+    const userId = req.id;
+
+    if (!userId) {
+        return res.status(400).json({ message: 'UserId is missing' });
+    }
+
+    const { spaceName } = req.params;
+
+    if (!spaceName) {
+        return res.status(400).json({ message: 'spaceName is missing' });
+    }
+
+    try {
+        const space = await prisma.space.findFirst({
+            where: {
+                spaceName: spaceName,
+                userId: userId
+            },
+            include: {
+                questions: true, // Include related questions
+                collectExtraInfo: true, // Include related extra info
+            },
+        });
+
+        if (!space) {
+            return res.status(404).json({ message: 'Space not found' });
+        }
+
+        // Generate pre-signed URLs for the space
+        const logoUrl = space.logo ? await getPresignedUrl(space.logo, 'getObject', 3600) : null;
+        const thankYouImageUrl = space.thankYouImage ? await getPresignedUrl(space.thankYouImage, 'getObject', 3600) : null;
+        space.questions.forEach((question: any) => {
+            delete question.questionId;
+            delete question.spaceId;
+        })
+
+        const updatedSpace = {
+            ...space,
+            logo: logoUrl,
+            thankYouImage: thankYouImageUrl
+        };
+
+        res.status(200).json({ space: updatedSpace });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to fetch space', error });
+    }
+});
+
 
 //route to create a new space
 router.post("/", async (req: any, res: any) => {
@@ -79,6 +144,17 @@ router.post("/", async (req: any, res: any) => {
         return res.status(400).json({ message: 'UserId is missing' });
     }
     try {
+        const existingSpace = await prisma.space.findFirst({
+            where: {
+                userId: userId,
+                spaceName: spaceName,
+            }
+        });
+
+        if (existingSpace) {
+            return res.status(400).json({ message: 'A space with this name already exists.' });
+        }
+
         const newSpace = await prisma.space.create({
             data: {
                 spaceName,
@@ -102,9 +178,9 @@ router.post("/", async (req: any, res: any) => {
                 questionLabel: questionLabel || 'QUESTIONS',
                 userId,
                 questions: {
-                    create: questions.map((question: { text: string; order: number }) => ({
+                    create: questions.map((question: { text: string; id: number }) => ({
                         text: question.text,
-                        order: question.order,
+                        id: question.id,
                     })),
                 },
                 collectExtraInfo: collectExtraInfo
@@ -173,6 +249,19 @@ router.put("/", async (req: any, res: any) => {
 
         if (existingSpace.userId !== userId) {
             return res.status(403).json({ message: 'You are not authorized to update this space' });
+        }
+
+         // Check if any other space with the same name exists for this user
+        const duplicateSpace = await prisma.space.findFirst({
+            where: {
+                userId: userId,
+                spaceName: spaceName,
+                NOT: { id: spaceId }  // Exclude the current space from the check
+            }
+        });
+
+        if (duplicateSpace) {
+            return res.status(409).json({ message: 'Another space with the same name already exists.' });
         }
 
         prisma.question.deleteMany({
@@ -268,6 +357,10 @@ router.delete("/", async (req: any, res: any) => {
             prisma.space.delete({
                 where: { id: spaceId },
             }),
+
+            prisma.review.deleteMany({
+                where: { spaceId: spaceId },
+            }),
         ]);
 
         res.status(200).json({ message: 'Space deleted successfully' });
@@ -277,7 +370,11 @@ router.delete("/", async (req: any, res: any) => {
     }
 });
 
-async function getPresignedUrl(key: string, operation: AWS.S3.Types.ObjectKey = 'getObject', expires: number = 3600): Promise<string> {
+async function getPresignedUrl(objectUrl: string | null | undefined, operation: AWS.S3.Types.ObjectKey = 'getObject', expires: number = 3600){
+    if (!objectUrl) return null; // Return null immediately if there's no key
+    const url = new URL(objectUrl);
+    const key = url.pathname.substring(1); 
+
     const params = {
         Bucket: process.env.S3_BUCKET_NAME!,
         Key: key,

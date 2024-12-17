@@ -53,13 +53,25 @@ export const signup = async (req: Request, res: Response): Promise<void> => {
       });
     }
 
-    // Respond with the created user details
-    res.status(201).json({
-      message: "User registered successfully.",
+    if (!env.JWT_SECRET) {
+      throw new Error("JWT_SECRET is not defined in the environment variables.");
+    }
+
+    const token = jwt.sign(
+      { id: newUser.id, email: newUser.email, role: newUser.role },
+      env.JWT_SECRET,
+      { expiresIn: "1h" }
+    );
+
+    // Respond with the token and user details
+    res.status(200).json({
+      message: "Sign-up successful.",
+      token,
       user: {
         id: newUser.id,
         firstname: newUser.firstname,
         email: newUser.email,
+        role: newUser.role,
         isGoogleUser: newUser.isGoogleUser,
       },
     });

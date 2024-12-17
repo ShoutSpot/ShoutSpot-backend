@@ -6,8 +6,10 @@ import { s3 } from '.';
 const router = express.Router();
 router.use(authenticateToken);
 
-const getPresignedUrl = async (key:string | null, expiresIn = 3600) => {
-    if (!key) return null; // Return null immediately if there's no key
+const getPresignedUrl = async (objectUrl:string | null | undefined, expiresIn = 3600) => {
+    if (!objectUrl) return null; // Return null immediately if there's no key
+    const url = new URL(objectUrl);
+    const key = url.pathname.substring(1); 
 
     const s3Params = {
         Bucket: process.env.S3_BUCKET_NAME,
@@ -27,7 +29,13 @@ const getPresignedUrl = async (key:string | null, expiresIn = 3600) => {
 };
 
 router.get('/', async (req: any, res: any) => {
-    const { spaceId } = req.body;
+     const userId = req.id;
+
+    if (!userId) {
+        return res.status(400).json({ message: 'UserId is missing' });
+    }
+
+    const spaceId = parseInt(req.query.spaceId, 10);
 
     if (!spaceId) {
         return res.status(400).json({ message: 'Invalid spaceID' });
@@ -40,21 +48,35 @@ router.get('/', async (req: any, res: any) => {
             },
         });
 
+        const space = await prisma.space.findFirst({
+            where: {
+                id: spaceId,
+            },
+        });
+
+        const spaceLogo = await getPresignedUrl(space?.logo);
+
         // Generate pre-signed URLs for the reviews
         const updatedReviews = await Promise.all(reviews.map(async review => {
             const reviewImageURL = await getPresignedUrl(review.reviewImage);
             const reviewVideoURL = await getPresignedUrl(review.reviewVideo);
-            const userLogoURL = await getPresignedUrl(review.userLogo);
+            const userLogoURL = await getPresignedUrl((review.userDetails as { userPhoto?: string })?.userPhoto);
+            delete (review as any).spaceId;
 
             return {
                 ...review,
                 reviewImage: reviewImageURL,
                 reviewVideo: reviewVideoURL,
-                userLogo: userLogoURL,
+                userDetails: {
+                    ...(typeof review.userDetails === "object" && review.userDetails !== null
+                        ? review.userDetails
+                        : {}),
+                    userPhoto: userLogoURL,
+                },
             };
         }));
 
-        res.json({reviews: updatedReviews});
+        res.json({reviews: updatedReviews, spaceLogo});
     } catch (error) {
         res.status(500).json({ message: 'Failed to retrieve reviews', error });
     }
@@ -83,7 +105,7 @@ router.post("/", async (req: any, res: any) => {
                 reviewText,
                 reviewImage,
                 reviewVideo,
-                userDetails: JSON.stringify(userDetails),
+                userDetails: userDetails,
                 spaceId,
             },
         });
@@ -96,25 +118,18 @@ router.post("/", async (req: any, res: any) => {
 
 router.put('/', async (req: any, res: any) => {
     const {
-        id: reviewId,
-        reviewType,
-        positiveStarsCount,
-        reviewText,
-        reviewImage,
-        reviewVideo,
-        userLogo,
-        userDetails,
+        reviewID,
         isLiked,
         isSpam,
     } = req.body;
 
-    if (!reviewId) {
+    if (!reviewID) {
         return res.status(400).json({ message: 'Review ID is missing' });
     }
 
     try {
         const existingReview = await prisma.review.findUnique({
-            where: { id: reviewId },
+            where: { reviewID },
         });
 
         if (!existingReview) {
@@ -122,15 +137,8 @@ router.put('/', async (req: any, res: any) => {
         }
 
         const updatedReview = await prisma.review.update({
-            where: { id: reviewId },
+            where: { reviewID },
             data: {
-                reviewType: reviewType,
-                positiveStarsCount: positiveStarsCount,
-                reviewText: reviewText,
-                reviewImage: reviewImage,
-                reviewVideo: reviewVideo,
-                userLogo: userLogo,
-                userDetails: userDetails,
                 isLiked: isLiked,
                 isSpam: isSpam
             },
@@ -143,16 +151,16 @@ router.put('/', async (req: any, res: any) => {
 });
 
 router.delete('/', async (req: any, res: any) => {
-    const { id: reviewId } = req.body;
+    const { reviewID } = req.body;
 
-    if (!reviewId) {
+    if (!reviewID) {
         return res.status(400).json({ message: 'Review ID is missing' });
     }
 
     try {
         await prisma.review.delete({
             where: {
-                id: reviewId
+                reviewID
             }
         });
 
