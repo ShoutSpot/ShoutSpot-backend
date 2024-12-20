@@ -2,6 +2,7 @@ import express from 'express';
 import prisma from '../prisma';
 import authenticateToken from '../middleware/authenticateToken';
 import { s3 } from '.';
+import axios from 'axios';
 
 const router = express.Router();
 router.use(authenticateToken);
@@ -94,10 +95,24 @@ router.post("/", async (req: any, res: any) => {
     } = req.body;
 
     if (!spaceId || !reviewType || !userDetails) {
-        return res.status(400).json({ message: 'Missing required fields: spaceId, reviewType, or userDetails' });
+        return res.status(400).json({ message: "Missing required fields: spaceId, reviewType, or userDetails" });
     }
 
     try {
+        // Call FastAPI to analyze spam and sentiment
+        let isSpam = false;
+        let sentiment = "video";
+
+        if (reviewText) {
+            const shoutSpotAIResponse = await axios.post("http://localhost:8000/detect_spam_sentiment", {
+                reviewText,
+            });
+
+            isSpam = shoutSpotAIResponse.data.isSpam;
+            sentiment = shoutSpotAIResponse.data.sentiment;
+        }
+
+        // Store the review in the database
         const newReview = await prisma.review.create({
             data: {
                 reviewType,
@@ -107,12 +122,14 @@ router.post("/", async (req: any, res: any) => {
                 reviewVideo,
                 userDetails: userDetails,
                 spaceId,
+                isSpam,
+                sentiment
             },
         });
 
         res.status(201).json(newReview);
     } catch (error) {
-        res.status(500).json({ message: 'Failed to add review', error });
+        res.status(500).json({ message: "Failed to add review", error });
     }
 });
 

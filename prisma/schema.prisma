@@ -85,6 +85,7 @@ model Review {
   isLiked           Boolean  @default(false)
   submitDateTime    DateTime @default(now())
   isSpam            Boolean @default(false)
+  sentiment         String? @default("positive")
   spaceId           Int
   space             Space    @relation(fields: [spaceId], references: [id])
 }
