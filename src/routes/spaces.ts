@@ -7,9 +7,55 @@ import { s3 } from ".";
 
 
 const router = express.Router();
+
+router.get("/single-space/:spaceName", async (req: any, res: any) => {
+    const userId = req.id;
+
+    const { spaceName } = req.params;
+
+    if (!spaceName) {
+        return res.status(400).json({ message: 'spaceName is missing' });
+    }
+
+    try {
+        const space = await prisma.space.findFirst({
+            where: {
+                spaceName: spaceName,
+                userId: userId
+            },
+            include: {
+                questions: true, // Include related questions
+                collectExtraInfo: true, // Include related extra info
+            },
+        });
+
+        if (!space) {
+            return res.status(404).json({ message: 'Space not found' });
+        }
+
+        // Generate pre-signed URLs for the space
+        const logoUrl = space.logo ? await getPresignedUrl(space.logo, 'getObject', 3600) : null;
+        const thankYouImageUrl = space.thankYouImage ? await getPresignedUrl(space.thankYouImage, 'getObject', 3600) : null;
+        space.questions.forEach((question: any) => {
+            delete question.questionId;
+            delete question.spaceId;
+        })
+
+        const updatedSpace = {
+            ...space,
+            logo: logoUrl,
+            thankYouImage: thankYouImageUrl
+        };
+
+        res.status(200).json({ space: updatedSpace });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to fetch space', error });
+    }
+});
+
+
 router.use(authenticateToken);
-
-
 //get all spaces route pertaining to a particular user
 router.get("/", async (req: any, res: any) => {
     const userId = req.id;
@@ -62,55 +108,6 @@ router.get("/", async (req: any, res: any) => {
     }
 });
 
-router.get("/single-space/:spaceName", async (req: any, res: any) => {
-    const userId = req.id;
-
-    if (!userId) {
-        return res.status(400).json({ message: 'UserId is missing' });
-    }
-
-    const { spaceName } = req.params;
-
-    if (!spaceName) {
-        return res.status(400).json({ message: 'spaceName is missing' });
-    }
-
-    try {
-        const space = await prisma.space.findFirst({
-            where: {
-                spaceName: spaceName,
-                userId: userId
-            },
-            include: {
-                questions: true, // Include related questions
-                collectExtraInfo: true, // Include related extra info
-            },
-        });
-
-        if (!space) {
-            return res.status(404).json({ message: 'Space not found' });
-        }
-
-        // Generate pre-signed URLs for the space
-        const logoUrl = space.logo ? await getPresignedUrl(space.logo, 'getObject', 3600) : null;
-        const thankYouImageUrl = space.thankYouImage ? await getPresignedUrl(space.thankYouImage, 'getObject', 3600) : null;
-        space.questions.forEach((question: any) => {
-            delete question.questionId;
-            delete question.spaceId;
-        })
-
-        const updatedSpace = {
-            ...space,
-            logo: logoUrl,
-            thankYouImage: thankYouImageUrl
-        };
-
-        res.status(200).json({ space: updatedSpace });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Failed to fetch space', error });
-    }
-});
 
 
 //route to create a new space

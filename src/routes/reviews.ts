@@ -157,14 +157,14 @@ router.post("/", async (req: any, res: any) => {
         let isSpam = false;
         let sentiment = "video";
 
-        // if (reviewText) {
-        //     const shoutSpotAIResponse = await axios.post("http://localhost:8000/detect_spam_sentiment", {
-        //         reviewText,
-        //     });
+        if (reviewText) {
+            const shoutSpotAIResponse = await axios.post("http://localhost:8000/detect_spam_sentiment", {
+                reviewText,
+            });
 
-        //     isSpam = shoutSpotAIResponse.data.isSpam;
-        //     sentiment = shoutSpotAIResponse.data.sentiment;
-        // }
+            isSpam = shoutSpotAIResponse.data.isSpam;
+            sentiment = shoutSpotAIResponse.data.sentiment;
+        }
 
         // Store the review in the database
         const newReview = await prisma.review.create({
