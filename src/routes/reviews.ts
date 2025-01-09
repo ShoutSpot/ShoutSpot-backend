@@ -3,6 +3,7 @@ import prisma from '../prisma';
 import authenticateToken from '../middleware/authenticateToken';
 import { s3 } from '.';
 import axios from 'axios';
+import { env } from "../config/env"; // Contains JWT_SECRET
 
 const router = express.Router();
 router.use(authenticateToken);
@@ -156,9 +157,10 @@ router.post("/", async (req: any, res: any) => {
         // Call FastAPI to analyze spam and sentiment
         let isSpam = false;
         let sentiment = "video";
+        const urlAI = env.URLFORBACKENDAI;
 
         if (reviewText) {
-            const shoutSpotAIResponse = await axios.post("http://localhost:8000/detect_spam_sentiment", {
+            const shoutSpotAIResponse = await axios.post(`${urlAI}/detect_spam_sentiment`, {
                 reviewText,
             });
 
