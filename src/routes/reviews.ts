@@ -6,6 +6,60 @@ import axios from 'axios';
 import { env } from "../config/env"; // Contains JWT_SECRET
 
 const router = express.Router();
+
+router.get('/liked', async (req: any, res: any) => {
+    const userId = req.id;
+
+   if (!userId) {
+       return res.status(400).json({ message: 'UserId is missing' });
+   }
+
+   const spaceId = parseInt(req.query.spaceId, 10);
+
+   if (!spaceId) {
+       return res.status(400).json({ message: 'Invalid spaceID' });
+   }
+
+   try {
+       const reviews = await prisma.review.findMany({
+           where: {
+               spaceId: spaceId,
+           },
+       });
+
+       const space = await prisma.space.findFirst({
+           where: {
+               id: spaceId,
+           },
+       });
+
+       const spaceLogo = await getPresignedUrl(space?.logo);
+
+       // Generate pre-signed URLs for the reviews
+       const updatedReviews = await Promise.all(reviews.filter(review => review.isLiked === true).map(async review => {
+           const reviewImageURL = await getPresignedUrl(review.reviewImage);
+           const reviewVideoURL = await getPresignedUrl(review.reviewVideo);
+           const userLogoURL = await getPresignedUrl((review.userDetails as { userPhoto?: string })?.userPhoto);
+           delete (review as any).spaceId;
+
+           return {
+               ...review,
+               reviewImage: reviewImageURL,
+               reviewVideo: reviewVideoURL,
+               userDetails: {
+                   ...(typeof review.userDetails === "object" && review.userDetails !== null
+                       ? review.userDetails
+                       : {}),
+                   userPhoto: userLogoURL,
+               },
+           };
+       }));
+
+       res.json({reviews: updatedReviews, spaceLogo});
+   } catch (error) {
+       res.status(500).json({ message: 'Failed to retrieve liked reviews', error });
+   }
+});
 router.use(authenticateToken);
 
 const getPresignedUrl = async (objectUrl:string | null | undefined, expiresIn = 3600) => {
@@ -84,59 +138,7 @@ router.get('/', async (req: any, res: any) => {
     }
 });
 
-router.get('/liked', async (req: any, res: any) => {
-    const userId = req.id;
 
-   if (!userId) {
-       return res.status(400).json({ message: 'UserId is missing' });
-   }
-
-   const spaceId = parseInt(req.query.spaceId, 10);
-
-   if (!spaceId) {
-       return res.status(400).json({ message: 'Invalid spaceID' });
-   }
-
-   try {
-       const reviews = await prisma.review.findMany({
-           where: {
-               spaceId: spaceId,
-           },
-       });
-
-       const space = await prisma.space.findFirst({
-           where: {
-               id: spaceId,
-           },
-       });
-
-       const spaceLogo = await getPresignedUrl(space?.logo);
-
-       // Generate pre-signed URLs for the reviews
-       const updatedReviews = await Promise.all(reviews.filter(review => review.isLiked === true).map(async review => {
-           const reviewImageURL = await getPresignedUrl(review.reviewImage);
-           const reviewVideoURL = await getPresignedUrl(review.reviewVideo);
-           const userLogoURL = await getPresignedUrl((review.userDetails as { userPhoto?: string })?.userPhoto);
-           delete (review as any).spaceId;
-
-           return {
-               ...review,
-               reviewImage: reviewImageURL,
-               reviewVideo: reviewVideoURL,
-               userDetails: {
-                   ...(typeof review.userDetails === "object" && review.userDetails !== null
-                       ? review.userDetails
-                       : {}),
-                   userPhoto: userLogoURL,
-               },
-           };
-       }));
-
-       res.json({reviews: updatedReviews, spaceLogo});
-   } catch (error) {
-       res.status(500).json({ message: 'Failed to retrieve liked reviews', error });
-   }
-});
 
 router.post("/", async (req: any, res: any) => {
     const {
