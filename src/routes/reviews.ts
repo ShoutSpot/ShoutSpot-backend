@@ -8,12 +8,7 @@ import { env } from "../config/env"; // Contains JWT_SECRET
 const router = express.Router();
 
 router.get('/liked', async (req: any, res: any) => {
-    const userId = req.id;
-
-   if (!userId) {
-       return res.status(400).json({ message: 'UserId is missing' });
-   }
-
+   
    const spaceId = parseInt(req.query.spaceId, 10);
 
    if (!spaceId) {
@@ -137,8 +132,6 @@ router.get('/', async (req: any, res: any) => {
         res.status(500).json({ message: 'Failed to retrieve reviews', error });
     }
 });
-
-
 
 router.post("/", async (req: any, res: any) => {
     const {
