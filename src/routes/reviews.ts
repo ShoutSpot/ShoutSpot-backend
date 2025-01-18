@@ -7,6 +7,50 @@ import { env } from "../config/env"; // Contains JWT_SECRET
 
 const router = express.Router();
 
+router.get('/review', async (req: any, res: any) => {
+    const reviewId = parseInt(req.query.reviewId, 10);
+
+    if (!reviewId) {
+        return res.status(400).json({ message: 'Invalid reviewID' });
+    }
+
+    try {
+        const review = await prisma.review.findUnique({
+            where: {
+                reviewID: reviewId,
+                
+            },
+        });
+
+        if (!review) {
+            return res.status(404).json({ message: 'Review not found' });
+        }
+
+        const reviewImageURL = await getPresignedUrl(review.reviewImage);
+        const reviewVideoURL = await getPresignedUrl(review.reviewVideo);
+        const userLogoURL = await getPresignedUrl((review.userDetails as { userPhoto?: string })?.userPhoto);
+
+        delete (review as any).spaceId;
+
+        const updatedReview = {
+            ...review,
+            reviewImage: reviewImageURL,
+            reviewVideo: reviewVideoURL,
+            userDetails: {
+                ...(typeof review.userDetails === "object" && review.userDetails !== null
+                    ? review.userDetails
+                    : {}),
+                userPhoto: userLogoURL,
+            },
+        };
+
+        res.json({ review: updatedReview });
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to retrieve review', error });
+    }
+});
+
+
 router.get('/liked', async (req: any, res: any) => {
    
    const spaceId = parseInt(req.query.spaceId, 10);
